@@ -13,7 +13,7 @@ export async function loadTarget(): Promise<Target | null> {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.warn('Invalid saved TV configuration:', error);
     const host = process.env.TV_HOST;
     const port = Number(process.env.TV_PORT || 5555);
-    current = host ? targetSchema.safeParse({ host, port }).data ?? null : null;
+    current = host ? targetSchema.safeParse({ host, port, mac: process.env.TV_MAC || undefined }).data ?? null : null;
   }
   return current;
 }

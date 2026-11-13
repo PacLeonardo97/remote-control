@@ -100,7 +100,7 @@ export default function App() {
       onClick={() => void tv.command(command)}
       onHoldStart={method === 'remote' ? () => void tv.hold(command, 'start') : undefined}
       onHoldEnd={method === 'remote' ? () => void tv.hold(command, 'end') : undefined}
-      disabled={!tv.status.connected || tv.busy}
+      disabled={(!tv.status.connected && !(method === 'adb' && command === 'POWER')) || tv.busy}
       className={className}
     />
   );
@@ -384,7 +384,7 @@ export default function App() {
               />
             </label>
             {method === "adb" && (
-              <label className="mb-4 block text-sm text-slate-400">
+              <><label className="mb-4 block text-sm text-slate-400">
                 Porta ADB
                 <input
                   type="number"
@@ -396,7 +396,7 @@ export default function App() {
                   }
                   className="mt-1 w-full rounded-xl bg-slate-800 p-3 text-white outline-none focus:ring-2 focus:ring-indigo-500"
                 />
-              </label>
+              </label><label className="mb-4 block text-sm text-slate-400">MAC da TV para ligar pela rede<input value={tv.target.mac || ''} onChange={e => tv.setTarget({ ...tv.target, mac: e.target.value || undefined })} placeholder="08:c3:b3:24:ef:93" className="mt-1 w-full rounded-xl bg-slate-800 p-3 text-white outline-none focus:ring-2 focus:ring-indigo-500"/><span className="mt-1 block text-xs text-slate-500">Necessário se ADB ficar offline em standby.</span></label></>
             )}
             <button
               disabled={tv.busy || !tv.target.host}

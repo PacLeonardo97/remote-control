@@ -33,3 +33,32 @@ test('ADB failures and timeouts propagate', async () => {
   const failing = new AdbService(async () => 'unable to connect');
   await assert.rejects(failing.connect(target), error => error instanceof TvError && error.code === 'CONNECT_FAILED');
 });
+test('Power uses WAKEUP in standby and toggles when awake', async () => {
+  const calls: string[][] = [];
+  let asleep = true;
+  const adb = new AdbService(async args => {
+    calls.push(args);
+    if (args[0] === 'devices') return '192.168.1.2:5555\tdevice';
+    if (args.includes('dumpsys')) return asleep ? 'mWakefulness=Asleep\nDisplay Power: state=OFF' : 'mWakefulness=Awake\nDisplay Power: state=ON';
+    return '';
+  });
+  await adb.command(target, 'POWER');
+  assert.deepEqual(calls.at(-1)?.slice(-2), ['keyevent', '224']);
+  asleep = false;
+  await adb.command(target, 'POWER');
+  assert.deepEqual(calls.at(-1)?.slice(-2), ['keyevent', '26']);
+});
+test('Power wakes offline TV with Wake-on-LAN, reconnect and WAKEUP', async () => {
+  const calls: string[][] = [];
+  const wake: string[] = [];
+  let connected = false;
+  const adb = new AdbService(async args => {
+    calls.push(args);
+    if (args[0] === 'devices') return connected ? '192.168.1.2:5555\tdevice' : '192.168.1.2:5555\toffline';
+    if (args[0] === 'connect') { connected = true; return 'connected to 192.168.1.2:5555'; }
+    return '';
+  }, async (mac, host) => { wake.push(`${mac}@${host}`); });
+  await adb.command({ ...target, mac: '08:c3:b3:24:ef:93' }, 'POWER');
+  assert.deepEqual(wake, ['08:c3:b3:24:ef:93@192.168.1.2']);
+  assert.deepEqual(calls.at(-1)?.slice(-2), ['keyevent', '224']);
+});

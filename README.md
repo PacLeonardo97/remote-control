@@ -47,6 +47,8 @@ Integração: [`@kud/androidtv-remote`](https://github.com/kud/androidtv-remote)
 
 Escolha **Usar ADB**, informe IP e porta ADB da TV em configurações e clique **Conectar**. Todos os controles e atalhos de aplicativos existentes continuam disponíveis. O pareamento ADB sem fio permanece separado do pareamento Remote Protocol.
 
+Para **ligar a TV pelo ADB**, configure também o endereço MAC da TV nas configurações (ou `TV_MAC` no ambiente inicial). Se a TV estiver em standby e o ADB aparecer offline, o botão Power envia Wake-on-LAN, tenta reconectar o ADB e então envia o comando Android `WAKEUP`. Se o ADB ainda estiver conectado e a tela estiver apagada, usa `WAKEUP` diretamente; com a tela ligada, Power mantém o comportamento de desligar. Ative **Quick Start** e **Network Standby** na TV. O [manual da TCL](https://www.tcl.com/content/dam/brandsite/region/australia/AU_Mediacenter/download/C645_Series_User_Manual.pdf) informa que despertar pela rede funciona em standby e requer essas opções; não funciona após desligamento completo pelo menu ou perda de energia. A TV e o Raspberry devem estar na mesma rede local para o pacote Wake-on-LAN chegar.
+
 Para iniciar automaticamente após o login do usuário, execute `bash scripts/install-raspberry-service.sh` após o build. Para manter o serviço ativo mesmo antes do login, execute o comando `sudo loginctl enable-linger SEU_USUARIO` mostrado pelo script. Consulte os logs com `journalctl --user -u tv-remote -f`. Após atualizar o projeto, execute `npm ci && npm run build && systemctl --user restart tv-remote`.
 
 ## Preparar e parear a TV
@@ -78,6 +80,7 @@ Em modo de rede, a API exige um token de pelo menos 24 caracteres. Ele é enviad
 - **ADB não encontrado:** confirme `adb version` no Raspberry e no usuário do serviço.
 - **TV desconectada no Remote Protocol:** confira se TV e Raspberry estão na mesma rede e se as portas TCP 6466/6467 estão acessíveis. Clique **Conectar** novamente; se o certificado foi revogado, remova o pareamento.
 - **TV desconectada no ADB:** confira IP, porta e depuração sem fio. A porta pode mudar depois de reiniciar a TV. A consulta periódica de status não tenta reconectar; clique **Conectar**.
+- **Power não liga a TV:** confira o MAC configurado, Quick Start e Network Standby. Um desligamento completo não pode ser revertido por ADB ou Wake-on-LAN. Se o Raspberry estiver em outra sub-rede, o roteador pode bloquear o pacote de broadcast.
 - **Pareamento falha:** use a porta de pareamento indicada pela TV e um código novo.
 - **Aplicativo não abre:** confirme a instalação e ajuste o pacote no `.env`.
 

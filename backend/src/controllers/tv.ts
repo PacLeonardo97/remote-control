@@ -15,7 +15,7 @@ export const status: RequestHandler = async (_req, res) => { res.json(await adb.
 export const connect: RequestHandler = async (req, res) => {
   const input = connectSchema.parse(req.body);
   const previous = getTarget();
-  const target = targetSchema.parse({ host: input.host ?? previous?.host, port: input.port ?? previous?.port ?? 5555 });
+  const target = targetSchema.parse({ host: input.host ?? previous?.host, port: input.port ?? previous?.port ?? 5555, mac: input.mac ?? previous?.mac });
   await saveTarget(target);
   await adb.connect(target);
   res.json(await adb.status(target));

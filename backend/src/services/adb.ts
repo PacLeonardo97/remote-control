@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Target } from './config.js';
 import { commands } from './validation.js';
+import { sendWakeOnLan } from './wake.js';
 
 const exec = promisify(execFile);
 export class TvError extends Error {
@@ -10,7 +11,7 @@ export class TvError extends Error {
 export type Runner = (args: string[]) => Promise<string>;
 export const realRunner: Runner = async (args) => {
   try {
-    const { stdout, stderr } = await exec('adb', args, { timeout: 8000, maxBuffer: 1024 * 1024 });
+    const { stdout, stderr } = await exec('adb', args, { timeout: args[0] === 'connect' ? 25000 : 8000, maxBuffer: 1024 * 1024 });
     return `${stdout}\n${stderr}`.trim();
   } catch (error) {
     const e = error as Error & { killed?: boolean; code?: string | number; stderr?: string };
@@ -20,7 +21,7 @@ export const realRunner: Runner = async (args) => {
   }
 };
 export class AdbService {
-  constructor(private run: Runner = realRunner) {}
+  constructor(private run: Runner = realRunner, private wakePacket: (mac: string, host: string) => Promise<void> = sendWakeOnLan) {}
   private address(target: Target): string { return `${target.host}:${target.port}`; }
   async status(target: Target | null): Promise<{ connected: boolean; address: string | null }> {
     if (!target) return { connected: false, address: null };
@@ -45,8 +46,44 @@ export class AdbService {
     return this.address(target);
   }
   async command(target: Target, command: keyof typeof commands): Promise<void> {
+    if (command === 'POWER') return this.power(target);
     const address = await this.requireConnected(target);
     await this.run(['-s', address, 'shell', 'input', 'keyevent', String(commands[command])]);
+  }
+  private async power(target: Target): Promise<void> {
+    const address = this.address(target);
+    let connected = false;
+    try { connected = (await this.status(target)).connected; } catch { /* ADB may be starting after standby. */ }
+    if (connected) {
+      try {
+        const power = await this.run(['-s', address, 'shell', 'dumpsys', 'power']);
+        if (/mWakefulness=(Asleep|Dozing)|Display Power: state=OFF/i.test(power)) {
+          await this.run(['-s', address, 'shell', 'input', 'keyevent', '224']);
+          return;
+        }
+        await this.run(['-s', address, 'shell', 'input', 'keyevent', '26']);
+        return;
+      } catch { /* ADB can become offline between the status check and the command. */ }
+    }
+    if (target.mac) {
+      try { await this.wakePacket(target.mac, target.host); } catch { /* ADB may still be reachable after standby. */ }
+    }
+    for (let attempt = 0; attempt < 8; attempt++) {
+      try {
+        if (attempt % 2 === 0) {
+          await this.run(['disconnect', address]);
+          await this.connect(target);
+        }
+        if ((await this.status(target)).connected) {
+          await this.run(['-s', address, 'shell', 'input', 'keyevent', '224']);
+          return;
+        }
+      } catch { /* Wait for the network and ADB transport to recover. */ }
+      await new Promise(resolve => setTimeout(resolve, 2500));
+    }
+    throw new TvError(503, 'TV_CANNOT_WAKE', target.mac
+      ? 'TV did not wake. Enable Quick Start and Network Standby on the TV, then retry.'
+      : 'TV is offline. Configure its MAC address for Wake-on-LAN and enable Quick Start and Network Standby.');
   }
   async app(target: Target, packageName: string): Promise<void> {
     const address = await this.requireConnected(target);

@@ -6,7 +6,7 @@ import { targetSchema, commands } from './validation.js';
 export type ConnectionMethod = 'adb' | 'remote';
 export type TVCommand = keyof typeof commands;
 export interface TVController {
-  connect(host: string, port?: number): Promise<unknown>;
+  connect(host: string, port?: number, mac?: string): Promise<unknown>;
   disconnect(): Promise<unknown>;
   getStatus(): Promise<unknown>;
   sendCommand(command: TVCommand): Promise<void>;
@@ -15,8 +15,8 @@ export interface TVController {
 export class ADBController implements TVController {
   constructor(private adb = new AdbService()) {}
   private target() { const target = getTarget(); if (!target) throw new TvError(400, 'NO_TV_CONFIGURED', 'Set the TV address first'); return target; }
-  async connect(host: string, port?: number) {
-    const target = targetSchema.parse({ host, port: port ?? getTarget()?.port ?? 5555 });
+  async connect(host: string, port?: number, mac?: string) {
+    const target = targetSchema.parse({ host, port: port ?? getTarget()?.port ?? 5555, mac: mac ?? getTarget()?.mac });
     await saveTarget(target); await this.adb.connect(target);
     return this.adb.status(target);
   }

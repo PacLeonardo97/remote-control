@@ -1,0 +1,14 @@
+import { Router } from "express";
+import * as tv from "../controllers/tv.js";
+import { asyncRoute } from "../middlewares/errors.js";
+export const tvRouter = Router();
+tvRouter.get("/status", asyncRoute(tv.status));
+tvRouter.get("/config", tv.config);
+tvRouter.post("/connect", asyncRoute(tv.connect));
+tvRouter.post("/disconnect", asyncRoute(tv.disconnect));
+tvRouter.post("/pair", asyncRoute(tv.pair));
+tvRouter.post("/command", asyncRoute(tv.command));
+tvRouter.post("/app", asyncRoute(tv.app));
+tvRouter.post("/text", asyncRoute(tv.sendText));
+tvRouter.get("/apps", tv.listApps);
+tvRouter.get("/info", asyncRoute(tv.info));

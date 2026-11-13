@@ -1,0 +1,17 @@
+{
+    "name": "tv-remote",
+    "private": true,
+    "workspaces": [
+        "frontend",
+        "backend"
+    ],
+    "scripts": {
+        "dev": "concurrently -k \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+        "build": "npm run build -w backend && npm run build -w frontend",
+        "test": "npm test -w backend"
+    },
+    "devDependencies": {
+        "concurrently": "^9.1.2",
+        "typescript": "^5.7.3"
+    }
+}

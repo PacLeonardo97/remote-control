@@ -1,0 +1,13 @@
+import { Router } from 'express';
+import * as remote from '../controllers/remote.js';
+import { asyncRoute } from '../middlewares/errors.js';
+export const remoteRouter = Router();
+remoteRouter.get('/status', asyncRoute(remote.status));
+remoteRouter.get('/discover', asyncRoute(remote.discover));
+remoteRouter.post('/connect', asyncRoute(remote.connect));
+remoteRouter.post('/pin', asyncRoute(remote.pin));
+remoteRouter.post('/disconnect', remote.disconnect);
+remoteRouter.delete('/pairing', asyncRoute(remote.forget));
+remoteRouter.post('/command', remote.command);
+remoteRouter.post('/text', remote.text);
+remoteRouter.post('/app', remote.app);

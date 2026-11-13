@@ -5,6 +5,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { timingSafeEqual } from 'node:crypto';
 import { tvRouter } from './routes/tv.js';
+import { remoteRouter } from './routes/remote.js';
+import { controlRouter } from './routes/control.js';
+import { remote } from './controllers/remote.js';
 import { errorHandler } from './middlewares/errors.js';
 import { loadTarget } from './services/config.js';
 
@@ -25,10 +28,13 @@ app.use('/api', (req, res, next) => {
   next();
 });
 app.use('/api/tv', tvRouter);
+app.use('/api/remote', remoteRouter);
+app.use('/api/control', controlRouter);
 app.use('/api', (_req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'API route not found' } }));
 const frontendDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../frontend/dist');
 app.use(express.static(frontendDist));
 app.get('*', (_req, res) => res.sendFile(path.join(frontendDist, 'index.html')));
 app.use(errorHandler);
 await loadTarget();
+await remote.load();
 app.listen(port, host, () => console.log(`TV API listening on http://${host}:${port}`));

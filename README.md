@@ -1,57 +1,74 @@
 # Controle remoto web para Android TV
 
-Controle local para TCL com Google TV ou outra Android TV. O navegador fala com a API Node.js; a API usa ADB instalado no Mac. Nenhum serviço externo é necessário.
+Controle local para TCL com Google TV ou outra Android TV. O navegador em qualquer aparelho da rede abre a interface hospedada no Raspberry Pi; o Raspberry executa ADB e envia comandos à TV. Nenhum serviço externo é necessário.
 
-## Requisitos no macOS
+## Instalar no Raspberry Pi
 
-- Node.js 20 ou mais recente e npm. Instale pelo site do Node.js ou com `brew install node`.
-- Android Platform Tools: `brew install android-platform-tools`. Confirme com `adb version`.
-- Mac e TV na mesma rede local.
-
-## Preparar a TV
-
-Na TV, abra **Configurações → Sistema → Sobre** e pressione **Build** várias vezes para ativar as opções de desenvolvedor. Em **Opções do desenvolvedor**, ative **Depuração sem fio** (ou depuração ADB, conforme o modelo). Anote o IP e a porta mostrados pela TV. Autorize o Mac na tela da TV quando solicitado.
-
-Em versões que exigem pareamento, selecione **Parear dispositivo com código** na TV. Na interface web, informe o IP, a *porta de pareamento* exibida e o código de seis dígitos; clique **Parear**. Depois use a *porta de conexão ADB* da tela principal da TV e clique **Salvar e conectar**. As duas portas podem ser diferentes. O código de pareamento não é salvo.
-
-Também é possível testar manualmente: `adb pair IP:PORTA_PAREAMENTO`, seguido de `adb connect IP:PORTA_ADB`.
-
-## Instalação e uso
+Use Raspberry Pi OS ou outra distribuição Linux para ARM, com Node.js **20 ou mais recente**, npm e `adb` no `PATH`. No Raspberry Pi OS, instale ADB com:
 
 ```bash
-npm install
+sudo apt update
+sudo apt install android-tools-adb
+adb version
+node --version
+```
+
+Se o Node instalado pela distribuição for anterior à versão 20, instale uma versão atual do Node.js para ARM antes de continuar. Copie esta pasta para o Raspberry (por Git, `scp` ou outro meio) e, nela, execute:
+
+```bash
+npm ci
+cp backend/.env.raspberry.example backend/.env
+openssl rand -hex 32
+```
+
+Edite `backend/.env` e cole o valor gerado em `API_TOKEN=`. O exemplo já habilita `API_HOST=0.0.0.0` para aceitar conexões da rede local. Em seguida:
+
+```bash
+npm run build
+npm test
+npm start
+```
+
+Descubra o IP do Raspberry com `hostname -I`. Em um celular ou computador **na mesma rede**, abra `http://IP_DO_RASPBERRY:3001`. A interface pedirá o token; informe o valor de `API_TOKEN`. Em configurações, digite o IP e a porta ADB da TV e clique em **Salvar e conectar**. A interface e a API usam a mesma porta, então não é necessário expor o Vite ou configurar CORS para cada aparelho.
+
+Para iniciar automaticamente após o login do usuário, execute `bash scripts/install-raspberry-service.sh` após o build. Para manter o serviço ativo mesmo antes do login, execute o comando `sudo loginctl enable-linger SEU_USUARIO` mostrado pelo script. Consulte os logs com `journalctl --user -u tv-remote -f`. Após atualizar o projeto, execute `npm ci && npm run build && systemctl --user restart tv-remote`.
+
+## Preparar e parear a TV
+
+Na TV, abra **Configurações → Sistema → Sobre** e pressione **Build** várias vezes para ativar as opções de desenvolvedor. Ative **Depuração sem fio** e anote IP e porta. O Raspberry e a TV precisam estar na mesma rede. Autorize o Raspberry na tela da TV quando solicitado.
+
+Se a TV pedir pareamento, selecione **Parear dispositivo com código**. Na interface, informe a *porta de pareamento* e o código de seis dígitos; clique **Parear**. Depois use a *porta de conexão ADB* na configuração da TV e clique **Salvar e conectar**. As portas podem ser diferentes. O código não é salvo. Também é possível usar `adb pair IP:PORTA_PAREAMENTO` e `adb connect IP:PORTA_ADB` no Raspberry, sob o mesmo usuário que executará o serviço.
+
+O endereço da TV é salvo em `backend/data/config.json` no Raspberry. `TV_HOST` e `TV_PORT` no `.env` definem valores iniciais. O campo de texto aceita ASCII; acentos e emojis não são suportados pelo `adb shell input text`. Os pacotes dos atalhos de aplicativos podem ser alterados pelas variáveis `APP_YOUTUBE`, `APP_NETFLIX`, `APP_PRIME` e `APP_DISNEY`.
+
+## Desenvolvimento local
+
+```bash
+npm ci
 cp backend/.env.example backend/.env
 npm run dev
 ```
 
-Abra `http://localhost:5173`. Em configurações, digite o IP ou nome e a porta ADB da TV. O endereço é salvo em `backend/data/config.json` com permissões restritas. O arquivo de ambiente `TV_HOST`/`TV_PORT` pode definir um valor inicial. Use os botões ou as setas, Enter, Esc e Espaço no teclado. Digite texto com foco em um campo de texto da TV.
+Abra `http://localhost:5173`. O Vite envia `/api` ao backend na porta 3001. Para testar o frontend de desenvolvimento em outros aparelhos, configure `DEV_HOST=0.0.0.0`, `API_HOST=0.0.0.0`, `API_TOKEN` e `FRONTEND_ORIGIN=http://IP_DO_RASPBERRY:5173`. Para uso normal no Raspberry, prefira `npm run build && npm start` e a porta 3001.
 
-O campo de texto aceita ASCII. O comando `adb shell input text` não oferece entrada Unicode confiável; acentos e emojis retornam um erro claro. Espaços são convertidos para `%s`. Para digitação Unicode seria necessário um método de entrada adicional na TV.
+## Segurança
 
-Atalhos de aplicativos usam os pacotes configuráveis `APP_YOUTUBE`, `APP_NETFLIX`, `APP_PRIME` e `APP_DISNEY` em `backend/.env`. Os padrões são conhecidos para Android TV, mas podem variar conforme a versão instalada.
-
-## Rede local e segurança
-
-A API e o Vite escutam apenas no loopback por padrão. Para abrir a interface na rede, configure `API_HOST=0.0.0.0`, `FRONTEND_ORIGIN=http://IP_DO_MAC:5173` e um `API_TOKEN` aleatório de pelo menos 24 caracteres no ambiente da API. Configure também o host do Vite para a rede em `frontend/vite.config.ts` e abra o frontend pelo IP do Mac. Informe o mesmo token nas configurações da interface. Não encaminhe a porta ADB nem a API para a internet. O token fica somente em `sessionStorage` no navegador.
-
-## API
-
-Rotas sob `/api/tv`: `GET /status`, `GET /config`, `GET /info`, `GET /apps`, `POST /connect`, `POST /disconnect`, `POST /pair`, `POST /command`, `POST /app`, `POST /text`. Erros usam `{ "error": { "code": "...", "message": "..." } }`. O status executa apenas `adb devices` e nunca reconecta sozinho. Comandos só aceitam nomes da lista em `backend/src/services/validation.ts`.
+Em modo de rede, a API exige um token de pelo menos 24 caracteres. Ele é enviado nos pedidos à API e guardado apenas no `sessionStorage` de cada navegador, até a aba ou sessão ser fechada. Como o acesso descrito usa HTTP local, use apenas uma rede doméstica confiável; para redes não confiáveis, coloque HTTPS na frente do serviço. Não encaminhe a porta 3001 nem a porta ADB para a internet. O ADB é executado somente no Raspberry e não recebe comandos arbitrários do navegador.
 
 ## Problemas comuns
 
-- **ADB não encontrado:** confirme `adb version` no mesmo terminal em que inicia o projeto.
-- **TV desconectada:** confirme IP, porta e rede; reative a depuração sem fio e clique em conectar. A porta pode mudar após reiniciar a TV.
-- **Falha no pareamento:** use a porta de pareamento, não a porta ADB principal, e gere um código novo na TV.
-- **Aplicativo não abre:** confirme que está instalado e ajuste o pacote correspondente no `.env`.
-- **Texto com acentos não entra:** limite do `adb input text`; use ASCII ou um método de entrada adicional.
-- **API não inicia em modo rede:** defina um `API_TOKEN` com pelo menos 24 caracteres.
+- **Página não abre:** confira o IP do Raspberry, se o serviço está ativo e se a porta 3001 é permitida no firewall local. Verifique se celular e Raspberry estão na mesma rede e sem isolamento de clientes Wi-Fi.
+- **Token inválido:** use o valor exato de `API_TOKEN` em `backend/.env`, salve e reinicie o serviço após alterá-lo.
+- **ADB não encontrado:** confirme `adb version` no Raspberry e no usuário do serviço.
+- **TV desconectada:** confira IP, porta e depuração sem fio. A porta pode mudar depois de reiniciar a TV. A consulta periódica de status não tenta reconectar; clique **Conectar**.
+- **Pareamento falha:** use a porta de pareamento indicada pela TV e um código novo.
+- **Aplicativo não abre:** confirme a instalação e ajuste o pacote no `.env`.
 
-## Verificação
+## API e testes
+
+Rotas sob `/api/tv`: `GET /status`, `/config`, `/info`, `/apps`; `POST /connect`, `/disconnect`, `/pair`, `/command`, `/app`, `/text`. Erros usam `{ "error": { "code": "...", "message": "..." } }`. Testes simulam ADB e não precisam da TV:
 
 ```bash
 npm test
 npm run build
 ```
-
-Os testes simulam ADB e não precisam de uma TV conectada. Para iniciar a versão compilada da API: `npm run start -w backend`.

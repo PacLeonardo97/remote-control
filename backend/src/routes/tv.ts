@@ -2,6 +2,7 @@ import { Router } from "express";
 import * as tv from "../controllers/tv.js";
 import { asyncRoute } from "../middlewares/errors.js";
 export const tvRouter = Router();
+
 tvRouter.get("/status", asyncRoute(tv.status));
 tvRouter.get("/config", tv.config);
 tvRouter.post("/connect", asyncRoute(tv.connect));

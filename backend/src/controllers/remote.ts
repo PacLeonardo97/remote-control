@@ -20,4 +20,17 @@ export const disconnect: RequestHandler = (_req, res) => { res.json(remote.disco
 export const forget: RequestHandler = async (_req, res) => { res.json(await remote.forget()); };
 export const command: RequestHandler = (req, res) => { const input = commandSchema.parse(req.body); remote.command(input.command); res.json({ ok: true }); };
 export const text: RequestHandler = (req, res) => { const input = textSchema.parse(req.body); remote.text(input.text); res.json({ ok: true }); };
-export const app: RequestHandler = (req, _res) => { appSchema.parse(req.body); throw new TvError(501, 'UNSUPPORTED', 'App shortcuts are available only with ADB'); };
+export const app: RequestHandler = (req, res) => { const { app } = appSchema.parse(req.body); remote.app(app); res.json({ ok: true }); };
+export const hold: RequestHandler = (req, res) => {
+  const { command, phase } = z.object({ command: commandSchema.shape.command, phase: z.enum(['start', 'end']) }).strict().parse(req.body);
+  remote.hold(command, phase); res.json({ ok: true });
+};
+export const events: RequestHandler = (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+  const unsubscribe = remote.subscribe(status => res.write(`data: ${JSON.stringify(status)}\n\n`));
+  const heartbeat = setInterval(() => res.write(': ping\n\n'), 15000);
+  req.on('close', () => { clearInterval(heartbeat); unsubscribe(); });
+};

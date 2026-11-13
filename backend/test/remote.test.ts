@@ -12,11 +12,14 @@ import { selectController, type TVController } from '../src/services/controller.
 const cert: Certificate = { key: 'private-key', cert: 'certificate' };
 class FakeClient extends EventEmitter {
   sent: number[] = [];
+  directions: Array<number | undefined> = [];
+  links: string[] = [];
   texts: string[] = [];
   stopped = false;
   async start(): Promise<boolean> { queueMicrotask(() => this.emit('secret')); return true; }
   sendCode(code: string): boolean { if (code !== 'ABCDEF') return false; queueMicrotask(() => this.emit('ready')); return true; }
-  sendKey(code: number): void { this.sent.push(code); }
+  sendKey(code: number, direction?: number): void { this.sent.push(code); this.directions.push(direction); }
+  sendAppLink(link: string): void { this.links.push(link); }
   sendText(text: string): void { this.texts.push(text); }
   getCertificate(): Certificate { return cert; }
   stop(): void { this.stopped = true; }
@@ -34,7 +37,20 @@ test('Remote Protocol pairs, saves certificate, sends commands, disconnects and 
     assert.equal((await remote.connect('192.168.1.5')).state, 'pairing');
     assert.equal((await remote.pin('ABCDEF')).state, 'connected');
     remote.command('HOME'); remote.text('Olá');
-    assert.equal(clients.at(-1)?.sent.length, 1);
+    const updates: Array<ReturnType<typeof remote.status>> = [];
+    const unsubscribe = remote.subscribe(status => updates.push(status));
+    clients.at(-1)?.emit('powered', true);
+    clients.at(-1)?.emit('volume', { level: 12, maximum: 30, muted: false });
+    clients.at(-1)?.emit('current_app', 'com.google.android.youtube.tv');
+    assert.equal(updates.at(-1)?.currentApp, 'com.google.android.youtube.tv');
+    assert.equal(updates.at(-1)?.volume?.level, 12);
+    assert.equal(updates.at(-1)?.powered, true);
+    unsubscribe();
+    remote.hold('RIGHT', 'start'); remote.hold('RIGHT', 'end');
+    assert.notEqual(clients.at(-1)?.directions.at(-2), clients.at(-1)?.directions.at(-1));
+    remote.app('youtube');
+    assert.deepEqual(clients.at(-1)?.links, ['https://www.youtube.com']);
+    assert.equal(clients.at(-1)?.sent.length, 3);
     assert.deepEqual(clients.at(-1)?.texts, ['Olá']);
     assert.equal(remote.disconnect().connected, false);
     assert.equal(clients.at(-1)?.stopped, true);

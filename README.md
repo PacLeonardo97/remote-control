@@ -37,7 +37,9 @@ Escolha **Usar Remote Protocol**, abra as configurações e informe o IP da TV. 
 
 O certificado e a chave gerados pela biblioteca ficam apenas em `backend/data/` no Raspberry, com permissões `0600`; o diretório recebe `0700`. O navegador não recebe essas credenciais. Após reiniciar o serviço, clique **Conectar** para reutilizar o certificado; não há conexão automática na abertura do site. **Remover pareamento salvo** desconecta e apaga a credencial local. Se a TV revogar a autorização, remova o pareamento e repita o fluxo.
 
-Os botões de navegação, volume, multimídia, Power e Configurações usam códigos de tecla do protocolo. O texto é enviado pela função de entrada IME da biblioteca, quando o campo da TV aceitar texto. Os atalhos YouTube, Netflix, Prime Video e Disney+ ficam desativados nesse método: o protocolo oferece links de abertura, mas os links corretos dependem dos aplicativos instalados e não foram validados para essas quatro opções. O estado é consultado sem iniciar conexão; a biblioteca tenta reconectar quando perde a sessão.
+Os botões de navegação, volume, multimídia, Power e Configurações usam códigos de tecla do protocolo. O texto é enviado pela função de entrada IME da biblioteca, quando o campo da TV aceitar texto. A interface mostra aplicativo aberto, energia e volume conforme os eventos enviados pela TV; até chegar o primeiro evento, exibe **Sem informação**. A atualização chega à interface por um fluxo de eventos da API. O touchpad traduz deslizes em setas e toque em OK; não controla um cursor livre. Segurar um botão por cerca de 450 ms inicia uma pressão longa, encerrada ao soltar (com limite de segurança no backend).
+
+Os atalhos YouTube, Netflix, Prime Video e Disney+ usam deep links enviados diretamente pelo Remote Protocol. Os links padrão seguem o [exemplo do projeto androidtvremote2](https://github.com/tronikos/androidtvremote2/blob/main/src/demo.py) e podem ser ajustados por `REMOTE_APP_YOUTUBE`, `REMOTE_APP_NETFLIX`, `REMOTE_APP_PRIME` e `REMOTE_APP_DISNEY` em `backend/.env`. O protocolo envia a solicitação, mas não confirma que o aplicativo abriu; o resultado varia conforme a versão instalada na TV. O estado é consultado sem iniciar conexão; a biblioteca tenta reconectar quando perde a sessão.
 
 Integração: [`@kud/androidtv-remote`](https://github.com/kud/androidtv-remote), versão 0.1.2, uma implementação TypeScript do protocolo v2 com pareamento por PIN, certificado reutilizável, comandos de tecla e texto. A API da biblioteca e os testes com mocks foram verificados neste projeto. O comportamento na sua TCL ainda precisa ser testado fisicamente.
 
@@ -81,7 +83,7 @@ Em modo de rede, a API exige um token de pelo menos 24 caracteres. Ele é enviad
 
 ## API e testes
 
-Rotas comuns sob `/api/control/:method` (`adb` ou `remote`): `GET /status`; `POST /connect`, `/disconnect`, `/command`, `/text`. As rotas ADB antigas em `/api/tv` continuam disponíveis, inclusive `/pair`, `/app` e `/info`. As rotas específicas do Remote Protocol em `/api/remote` incluem `GET /discover`, `POST /pin` e `DELETE /pairing`. Erros usam `{ "error": { "code": "...", "message": "..." } }`. Testes simulam ADB e Remote Protocol e não precisam da TV:
+Rotas comuns sob `/api/control/:method` (`adb` ou `remote`): `GET /status`; `POST /connect`, `/disconnect`, `/command`, `/text`. As rotas ADB antigas em `/api/tv` continuam disponíveis, inclusive `/pair`, `/app` e `/info`. As rotas específicas do Remote Protocol em `/api/remote` incluem `GET /discover`, `/events`; `POST /pin`, `/app`, `/hold`; `DELETE /pairing`. Erros usam `{ "error": { "code": "...", "message": "..." } }`. Testes simulam ADB e Remote Protocol e não precisam da TV:
 
 ```bash
 npm test
